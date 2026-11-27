@@ -28,6 +28,7 @@ import app.reader.AppController
 import app.reader.DarkJr
 import app.reader.Hooks
 import app.reader.LightJr
+import app.reader.ReadingOrientation
 import app.reader.SettingsStore
 
 class MainActivity : ComponentActivity() {
@@ -50,8 +51,12 @@ class MainActivity : ComponentActivity() {
                 it.screenBrightness = v ?: WindowManager.LayoutParams.BRIGHTNESS_OVERRIDE_NONE
             }
         }
-        Hooks.lockRotation = { lock ->
-            requestedOrientation = if (lock) ActivityInfo.SCREEN_ORIENTATION_LOCKED else ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+        Hooks.setOrientation = { orientation ->
+            requestedOrientation = when (orientation) {
+                ReadingOrientation.System -> ActivityInfo.SCREEN_ORIENTATION_UNSPECIFIED
+                ReadingOrientation.Landscape -> ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+                ReadingOrientation.Locked -> ActivityInfo.SCREEN_ORIENTATION_LOCKED
+            }
         }
         Hooks.setNightMode = { dark -> applyNightMode(dark) }
         Hooks.share = { text ->

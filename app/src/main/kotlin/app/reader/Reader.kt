@@ -102,7 +102,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-private enum class Panel { Themes, Customise, Fonts, Contents, Search, Note, HlNote }
+private enum class Panel { Themes, Customise, Fonts, Contents, Search, Note, HlNote, Orientation, Practice }
 
 /** A page turn in progress. */
 private class Turn {
@@ -592,6 +592,7 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
             onClose = onClose, onBookmark = { toggleBookmark() },
             onScrub = { goTo(it) },
             onContents = { panel = Panel.Contents }, onSearch = { panel = Panel.Search }, onThemes = { panel = Panel.Themes },
+            onOrientation = { panel = Panel.Orientation }, onPractice = { panel = Panel.Practice },
             onSettings = { controller.updateSettings(it) },
             onShare = { Hooks.share("${book.title}${if (book.author.isNotBlank()) " by ${book.author}" else ""} — reading it in JustRead") },
         )
@@ -623,6 +624,22 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
                     onDelete = { controller.putHighlight(shelf, h.copy(note = "", edited = nowMillis())); panel = null; noteFor = null },
                     onDismiss = { panel = null; noteFor = null })
             }
+            Panel.Practice -> PracticeDialog(book, locator) { panel = null }
+            Panel.Orientation -> androidx.compose.material3.AlertDialog(
+                onDismissRequest = { panel = null },
+                title = { Text("Reading orientation") },
+                text = {
+                    Column {
+                        for (option in ReadingOrientation.entries) {
+                            MenuRow(option.label, if (option == settings.orientation) JrIcons.Check else null) {
+                                controller.updateSettings(settings.copy(orientation = option))
+                                panel = null
+                            }
+                        }
+                    }
+                },
+                confirmButton = {},
+            )
             Panel.Note -> JrSheet(onDismiss = { panel = null }) {
                 SheetTitle("Note", onClose = { panel = null })
                 Text(note.orEmpty(), style = JrType.bodyLarge, color = LocalJr.current.onBackground,
@@ -699,12 +716,12 @@ private fun ReaderChrome(
     wide: Boolean, landscape: Boolean, step: Int,
     onClose: () -> Unit, onBookmark: () -> Unit, onScrub: (Int) -> Unit,
     onContents: () -> Unit, onSearch: () -> Unit, onThemes: () -> Unit,
-    onSettings: (ReaderSettings) -> Unit, onShare: () -> Unit,
+    onOrientation: () -> Unit, onPractice: () -> Unit, onSettings: (ReaderSettings) -> Unit, onShare: () -> Unit,
 ) {
     val jr = LocalJr.current
     if (wide) {
         WideChrome(visible, book, chapter, pages, index, bookmarked, settings, landscape, step,
-            onClose, onBookmark, onScrub, onContents, onSearch, onThemes, onSettings, onShare)
+            onClose, onBookmark, onScrub, onContents, onSearch, onThemes, onOrientation, onPractice, onSettings, onShare)
         return
     }
     Box(Modifier.fillMaxSize()) {
@@ -748,7 +765,8 @@ private fun ReaderChrome(
                         DropdownMenu(more, onDismissRequest = { more = false }, containerColor = jr.menu) {
                             MenuRow(if (bookmarked) "Remove bookmark" else "Add bookmark", if (bookmarked) JrIcons.BookmarkFilled else JrIcons.Bookmark) { more = false; onBookmark() }
                             MenuRow("Line guide", JrIcons.LineGuide, if (settings.lineGuide) "On" else "Off") { onSettings(settings.copy(lineGuide = !settings.lineGuide)) }
-                            MenuRow("Lock rotation", JrIcons.LockRotation, if (settings.lockRotation) "On" else "Off") { onSettings(settings.copy(lockRotation = !settings.lockRotation)) }
+                            MenuRow("Speed practice", JrIcons.LineGuide) { more = false; onPractice() }
+                            MenuRow("Orientation", JrIcons.LockRotation, settings.orientation.label) { more = false; onOrientation() }
                             MenuRow("Share", JrIcons.Share) { more = false; onShare() }
                         }
                     }
@@ -768,7 +786,7 @@ private fun WideChrome(
     landscape: Boolean, step: Int,
     onClose: () -> Unit, onBookmark: () -> Unit, onScrub: (Int) -> Unit,
     onContents: () -> Unit, onSearch: () -> Unit, onThemes: () -> Unit,
-    onSettings: (ReaderSettings) -> Unit, onShare: () -> Unit,
+    onOrientation: () -> Unit, onPractice: () -> Unit, onSettings: (ReaderSettings) -> Unit, onShare: () -> Unit,
 ) {
     val jr = LocalJr.current
     val sides = WindowInsets.systemBars.union(WindowInsets.displayCutout).only(WindowInsetsSides.Horizontal)
@@ -797,10 +815,11 @@ private fun WideChrome(
                     if (bookmarked) jr.primary else jr.onBackground, onClick = onBookmark)
                 var more by remember { mutableStateOf(false) }
                 Box {
-                    IconBtn(JrIcons.More, "More: line guide, lock rotation, share", jr.onBackground) { more = true }
+                    IconBtn(JrIcons.More, "More reading options", jr.onBackground) { more = true }
                     DropdownMenu(more, onDismissRequest = { more = false }, containerColor = jr.menu) {
                         MenuRow("Line guide", JrIcons.LineGuide, if (settings.lineGuide) "On" else "Off") { onSettings(settings.copy(lineGuide = !settings.lineGuide)) }
-                        MenuRow("Lock rotation", JrIcons.LockRotation, if (settings.lockRotation) "On" else "Off") { onSettings(settings.copy(lockRotation = !settings.lockRotation)) }
+                        MenuRow("Speed practice", JrIcons.LineGuide) { more = false; onPractice() }
+                        MenuRow("Orientation", JrIcons.LockRotation, settings.orientation.label) { more = false; onOrientation() }
                         MenuRow("Share", JrIcons.Share) { more = false; onShare() }
                     }
                 }
