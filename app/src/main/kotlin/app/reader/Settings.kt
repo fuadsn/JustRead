@@ -9,6 +9,8 @@ enum class PageTurn(val label: String) { Curl("Curl"), Slide("Slide"), Scroll("S
 /** Light / Dark / follow the system / follow the room's light (light sensor, where there is one). */
 enum class Appearance(val label: String) { Light("Light"), Dark("Dark"), System("System"), Ambient("Ambient") }
 
+enum class ReadingOrientation(val label: String) { System("Follow phone"), Landscape("Landscape"), Locked("Lock current orientation") }
+
 enum class Columns(val label: String) { Auto("Auto"), One("One"), Two("Two") }
 
 enum class FontGroup(val label: String) { Book("From the book"), Serif("Serif"), Sans("Sans serif") }
@@ -123,7 +125,7 @@ data class ReaderSettings(
     /** Screen brightness 0…1 while reading, or −1 to follow the system. */
     val brightness: Float = -1f,
     val lineGuide: Boolean = false,
-    val lockRotation: Boolean = false,
+    val orientation: ReadingOrientation = ReadingOrientation.System,
 ) {
     /** Whether pages and the app chrome are dark, given the system's and the room's state. */
     fun isDark(systemDark: Boolean, ambientDark: Boolean? = null) = theme.isDarkTheme || appearanceDark(systemDark, ambientDark)
@@ -161,7 +163,7 @@ data class ReaderSettings(
         "v=2", "theme=${theme.name}", "appearance=${appearance.name}", "font=${font.name}", "size=$sizeStep",
         "custom=$customized", "bold=$bold", "justify=$justify", "cs=$customSpacing", "lh=$lineHeight", "ls=$letterSpacing",
         "ws=$wordSpacing", "madj=$marginAdjust", "columns=${columns.name}", "turn=${pageTurn.name}",
-        "bright=$brightness", "guide=$lineGuide", "lock=$lockRotation",
+        "bright=$brightness", "guide=$lineGuide", "orientation=${orientation.name}",
     ).joinToString(";")
 
     companion object {
@@ -206,7 +208,7 @@ data class ReaderSettings(
                     pageTurn = enumOr(m["turn"], d.pageTurn),
                     brightness = m["bright"]?.toFloatOrNull()?.coerceIn(-1f, 1f) ?: -1f,
                     lineGuide = m["guide"]?.toBoolean() ?: false,
-                    lockRotation = m["lock"]?.toBoolean() ?: false,
+                    orientation = enumOr(m["orientation"], if (m["lock"] == "true") ReadingOrientation.Locked else ReadingOrientation.System),
                 )
             }.getOrDefault(d)
         }

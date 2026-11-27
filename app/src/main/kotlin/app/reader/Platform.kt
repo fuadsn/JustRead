@@ -244,7 +244,7 @@ fun rememberAmbientDark(): Boolean? {
 object Hooks {
     /** Window brightness 0…1, or null to follow the system. */
     var setBrightness: (Float?) -> Unit = {}
-    var lockRotation: (Boolean) -> Unit = {}
+    var setOrientation: (ReadingOrientation) -> Unit = {}
     var share: (String) -> Unit = {}
     /** Tells the system the app's light/dark choice (null = follow the system), so the next launch screen matches. */
     var setNightMode: (Boolean?) -> Unit = {}

@@ -362,7 +362,9 @@ fun App(controller: AppController = remember { AppController() }, systemDark: Bo
     LaunchedEffect(settings.appearance) {
         Hooks.setNightMode(when (settings.appearance) { Appearance.Light -> false; Appearance.Dark -> true; else -> null })
     }
-    LaunchedEffect(reading != null, settings.lockRotation) { Hooks.lockRotation(reading != null && settings.lockRotation) }
+    LaunchedEffect(reading != null, settings.orientation) {
+        Hooks.setOrientation(if (reading != null) settings.orientation else ReadingOrientation.System)
+    }
 
     JustReadTheme(uiDark) {
         CompositionLocalProvider(LocalBackStack provides controller.back) {
