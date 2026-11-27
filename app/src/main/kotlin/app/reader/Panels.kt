@@ -250,8 +250,13 @@ fun CustomiseScreen(settings: ReaderSettings, colors: ThemeColors, onChange: (Re
                 if (on) set(settings.copy(marginAdjust = ((it * 2 - 1) * ml).roundToInt()))
             }
         }
-        SectionLabel("Columns", Modifier.padding(top = 16.dp, bottom = 8.dp))
-        Segmented(Columns.entries.map { it.label }, settings.columns.ordinal) { set(settings.copy(columns = Columns.entries[it])) }
+        if (tablet || !sideways) {
+            SectionLabel("Columns", Modifier.padding(top = 16.dp, bottom = 8.dp))
+            Segmented(Columns.entries.map { it.label }, settings.columns.ordinal) { set(settings.copy(columns = Columns.entries[it])) }
+        }
+        if (!tablet) SwitchRow("Speed reading in landscape", "Show one passage at a time when the phone is sideways", settings.landscapeSpeedReading) {
+            onChange(settings.copy(landscapeSpeedReading = it))
+        }
     }
     /** The theme as it reads, in [lines] lines of the sample. */
     val preview: @Composable (Modifier, Int) -> Unit = { m, lines ->

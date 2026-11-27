@@ -102,7 +102,7 @@ import kotlin.math.abs
 import kotlin.math.max
 import kotlin.math.roundToInt
 
-private enum class Panel { Themes, Customise, Fonts, Contents, Search, Note, HlNote, Orientation, Practice }
+private enum class Panel { Themes, Customise, Fonts, Contents, Search, Note, HlNote, Orientation }
 
 /** A page turn in progress. */
 private class Turn {
@@ -171,9 +171,18 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
         val safe = WindowInsets.systemBars.union(WindowInsets.displayCutout)
         val insetTop = safe.getTop(density).toFloat()
         val insetBottom = safe.getBottom(density).toFloat()
-        // two pages side by side on a wide screen held sideways (or when asked for), as in the design
+        // Phone landscape uses the full width for one reading surface.
         val dpW = w / density.density; val dpH = h / density.density
-        val spread = settings.pageTurn != PageTurn.Scroll && when (settings.columns) {
+        val phoneLandscape = dpW > dpH && minOf(dpW, dpH) < 600f
+        var manualSpeed by remember(book, phoneLandscape) { mutableStateOf(false) }
+        val speedReading = if (phoneLandscape) settings.landscapeSpeedReading else manualSpeed
+        fun setSpeed(enabled: Boolean) {
+            panel = null
+            chrome = !enabled
+            if (phoneLandscape) controller.updateSettings(settings.copy(landscapeSpeedReading = enabled))
+            else manualSpeed = enabled
+        }
+        val spread = !phoneLandscape && settings.pageTurn != PageTurn.Scroll && when (settings.columns) {
             Columns.One -> false
             Columns.Two -> dpW >= 480f
             Columns.Auto -> dpW > dpH && dpW >= 600f
@@ -213,6 +222,16 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
 
         fun chapterName(i: Int): String = toc.lastOrNull { it.page <= i }?.title
             ?: book.chapters.getOrNull(pages[i].chapter)?.title.orEmpty()
+        // Repagination changes page numbers, but keep the precise character reached in sentence view.
+        LaunchedEffect(pg) { controller.savePosition(shelf, locator, index, pages.size, chapterName(index)) }
+        if (speedReading && panel == null) {
+            SentenceReader(book, locator, settings, colors, onMove = { position ->
+                val page = pg.pageFor(position.chapter, position.block, position.char)
+                locator = position
+                controller.savePosition(shelf, position, page, pages.size, chapterName(page))
+            }, onNormal = { setSpeed(false) }, onLibrary = onClose)
+            return@BoxWithConstraints
+        }
         /** A page's running header: the book's title, or the chapter's on the right-hand page of a spread. */
         fun header(i: Int) = if (side(i) == PageSide.Right) chapterName(i) else book.title
         fun DrawScope.paintPage(i: Int) {
@@ -262,9 +281,6 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
             controller.putHighlight(shelf, h)
             return h
         }
-
-        // record where we are (progress and chapter for the library) once the book is laid out
-        LaunchedEffect(pg) { goTo(index) }
 
         // render this page and its neighbours ahead of time, one per frame, while nothing moves
         LaunchedEffect(pg, colors, marks, index, w, h) {
@@ -382,7 +398,11 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
         val guide = if (settings.lineGuide) (if (guideY < 0f) h * 0.42f else guideY) else -1f
 
         if (settings.pageTurn == PageTurn.Scroll) {
-            ScrollReader(pages, pg, colors, index, picture, marks, pageDark, readerModifier, onTap = { chrome = !chrome }) { i -> goTo(i) }
+            androidx.compose.runtime.key(pg) {
+                ScrollReader(pages, pg, colors, index, picture, marks, pageDark, readerModifier, onTap = { chrome = !chrome }) { i ->
+                    if (i != index) goTo(i)
+                }
+            }
         } else {
             Canvas(readerModifier
                 .clipToBounds()
@@ -592,7 +612,7 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
             onClose = onClose, onBookmark = { toggleBookmark() },
             onScrub = { goTo(it) },
             onContents = { panel = Panel.Contents }, onSearch = { panel = Panel.Search }, onThemes = { panel = Panel.Themes },
-            onOrientation = { panel = Panel.Orientation }, onPractice = { panel = Panel.Practice },
+            onOrientation = { panel = Panel.Orientation }, onPractice = { setSpeed(true) },
             onSettings = { controller.updateSettings(it) },
             onShare = { Hooks.share("${book.title}${if (book.author.isNotBlank()) " by ${book.author}" else ""} — reading it in JustRead") },
         )
@@ -624,7 +644,6 @@ fun ReaderScreen(controller: AppController, shelf: ShelfBook, book: EpubBook, ui
                     onDelete = { controller.putHighlight(shelf, h.copy(note = "", edited = nowMillis())); panel = null; noteFor = null },
                     onDismiss = { panel = null; noteFor = null })
             }
-            Panel.Practice -> PracticeDialog(book, locator) { panel = null }
             Panel.Orientation -> androidx.compose.material3.AlertDialog(
                 onDismissRequest = { panel = null },
                 title = { Text("Reading orientation") },
@@ -693,7 +712,8 @@ private fun ScrollReader(
 ) {
     val state = rememberLazyListState(initialFirstVisibleItemIndex = index)
     val density = LocalDensity.current
-    LaunchedEffect(state) { snapshotFlow { state.firstVisibleItemIndex }.collect { onVisible(it) } }
+    val reportVisible by androidx.compose.runtime.rememberUpdatedState(onVisible)
+    LaunchedEffect(state) { snapshotFlow { state.firstVisibleItemIndex }.collect { reportVisible(it) } }
     val pad = pg.spec.marginTop / 3f
     val itemH = with(density) { (pg.spec.columnHeight + pad).toDp() }
     LazyColumn(state = state, modifier = modifier.windowInsetsPadding(WindowInsets.statusBars).pointerInput(Unit) { detectTapGestures { onTap() } }) {
@@ -765,7 +785,7 @@ private fun ReaderChrome(
                         DropdownMenu(more, onDismissRequest = { more = false }, containerColor = jr.menu) {
                             MenuRow(if (bookmarked) "Remove bookmark" else "Add bookmark", if (bookmarked) JrIcons.BookmarkFilled else JrIcons.Bookmark) { more = false; onBookmark() }
                             MenuRow("Line guide", JrIcons.LineGuide, if (settings.lineGuide) "On" else "Off") { onSettings(settings.copy(lineGuide = !settings.lineGuide)) }
-                            MenuRow("Speed practice", JrIcons.LineGuide) { more = false; onPractice() }
+                            MenuRow("Speed reading", JrIcons.LineGuide) { more = false; onPractice() }
                             MenuRow("Orientation", JrIcons.LockRotation, settings.orientation.label) { more = false; onOrientation() }
                             MenuRow("Share", JrIcons.Share) { more = false; onShare() }
                         }
@@ -818,7 +838,7 @@ private fun WideChrome(
                     IconBtn(JrIcons.More, "More reading options", jr.onBackground) { more = true }
                     DropdownMenu(more, onDismissRequest = { more = false }, containerColor = jr.menu) {
                         MenuRow("Line guide", JrIcons.LineGuide, if (settings.lineGuide) "On" else "Off") { onSettings(settings.copy(lineGuide = !settings.lineGuide)) }
-                        MenuRow("Speed practice", JrIcons.LineGuide) { more = false; onPractice() }
+                        MenuRow("Speed reading", JrIcons.LineGuide) { more = false; onPractice() }
                         MenuRow("Orientation", JrIcons.LockRotation, settings.orientation.label) { more = false; onOrientation() }
                         MenuRow("Share", JrIcons.Share) { more = false; onShare() }
                     }
