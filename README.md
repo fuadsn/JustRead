@@ -53,9 +53,6 @@ and encrypted (DRM) books are refused.
 Get the latest APK from [Releases](https://github.com/JobinBiju/JustRead/releases/latest). Most
 phones want the `arm64-v8a` build; the `universal` one works anywhere. Android 8.0 or newer.
 
-From 1.0.5, JustRead looks for new releases here when it starts and offers to update itself; you can
-also check from the library's menu (Check for updates). Android asks once to allow installs from JustRead.
-
 ## Building
 
 You need JDK 17 or newer and the Android SDK.

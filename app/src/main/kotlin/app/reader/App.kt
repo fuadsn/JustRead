@@ -6,31 +6,15 @@ import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateListOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.widthIn
-import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.size
-import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.layout.WindowInsets
-import androidx.compose.foundation.layout.navigationBars
-import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.windowInsetsPadding
-import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.ui.Alignment
-import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.unit.dp
 import androidx.compose.runtime.produceState
 import androidx.compose.ui.Modifier
@@ -68,21 +52,6 @@ data class Locator(val chapter: Int, val block: Int, val char: Int) {
 
 data class Bookmark(val locator: Locator, val created: Long)
 
-/** Where an app update stands, shown as a card at the top of the library. */
-sealed class UpdateState {
-    data object Idle : UpdateState()
-    /** A newer release; [bytes] is the size of the APK this phone would download (0 if unknown). */
-    data class Available(val version: String, val installed: String, val bytes: Long) : UpdateState()
-    data class Downloading(val version: String, val done: Long, val total: Long) : UpdateState()
-    /** Downloaded and checked; Install hands it to Android. */
-    data class Ready(val version: String) : UpdateState()
-    data class Failed(val title: String, val message: String) : UpdateState()
-}
-
-/** A short message at the bottom of the screen, with an optional leading mark. */
-data class Toast(val text: String, val mark: ToastMark = ToastMark.None, val at: Long = nowMillis())
-enum class ToastMark { None, Working, Done }
-
 enum class SortBy(val label: String) { Recent("Recently read"), Title("Title"), Author("Author"), Added("Date added"), Progress("Progress") }
 enum class ShelfView { Grid, List }
 
@@ -105,18 +74,6 @@ class AppController(private val restoreLastBook: Boolean = true) {
     var requestOpenFile: (() -> Unit)? = null
 
     /** Bumped whenever saved per-book data changes, so the library recomposes. */
-    var update by mutableStateOf<UpdateState>(UpdateState.Idle)
-
-    /** A short message shown at the bottom of the screen, with the time it was raised. */
-    var toast by mutableStateOf<Toast?>(null)
-    fun showToast(text: String, mark: ToastMark = ToastMark.None) { toast = Toast(text, mark) }
-    fun hideToast() { toast = null }
-    /** Set by the app shell where updates are possible: check (true when the reader asked), download, cancel, install. */
-    var checkForUpdates: ((manual: Boolean) -> Unit)? = null
-    var downloadUpdate: (() -> Unit)? = null
-    var cancelUpdate: (() -> Unit)? = null
-    var installUpdate: (() -> Unit)? = null
-
     var metaVersion by mutableIntStateOf(0)
         private set
     private fun touch() { metaVersion++ }
@@ -309,45 +266,6 @@ class AppController(private val restoreLastBook: Boolean = true) {
     }
 }
 
-/**
- * The app's own toast, as in the design: a dark bar across the bottom with an optional mark, gone after
- * a moment (a "working" one stays until it is replaced).
- */
-@Composable
-private fun JrToast(controller: AppController) {
-    val jr = LocalJr.current
-    val t = controller.toast
-    var shown by remember { mutableStateOf<Toast?>(null) }
-    if (t != null) shown = t
-    LaunchedEffect(t) {
-        if (t != null) {
-            kotlinx.coroutines.delay(if (t.mark == ToastMark.Working) 15_000 else 3_000)
-            if (controller.toast == t) controller.toast = null
-        }
-    }
-    val bg = if (jr.dark) Color(0xFFECE1D2) else Color(0xFF382F25)
-    val fg = if (jr.dark) Color(0xFF382F25) else Color(0xFFF6EDE0)
-    Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.navigationBars).padding(start = 16.dp, end = 16.dp, bottom = 28.dp),
-        contentAlignment = Alignment.BottomCenter) {
-        androidx.compose.animation.AnimatedVisibility(t != null,
-            enter = androidx.compose.animation.fadeIn() + androidx.compose.animation.slideInVertically { it / 2 },
-            exit = androidx.compose.animation.fadeOut()) {
-            val s = shown ?: return@AnimatedVisibility
-            Row(Modifier.widthIn(max = 600.dp).fillMaxWidth().heightIn(min = 48.dp)
-                .shadow(6.dp, RoundedCornerShape(4.dp), ambientColor = jr.shadow, spotColor = jr.shadow)
-                .clip(RoundedCornerShape(4.dp)).background(bg).padding(horizontal = 16.dp, vertical = 12.dp),
-                verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                when (s.mark) {
-                    ToastMark.Working -> androidx.compose.material3.CircularProgressIndicator(Modifier.size(20.dp), color = fg, strokeWidth = 2.5.dp, trackColor = Color.Transparent)
-                    ToastMark.Done -> androidx.compose.material3.Icon(JrIcons.Check, null, tint = fg, modifier = Modifier.size(20.dp))
-                    ToastMark.None -> {}
-                }
-                Text(s.text, style = JrType.body, color = fg)
-            }
-        }
-    }
-}
-
 @Composable
 fun App(controller: AppController = remember { AppController() }, systemDark: Boolean = false) {
     rememberBundledFonts()
@@ -385,7 +303,6 @@ fun App(controller: AppController = remember { AppController() }, systemDark: Bo
             } else {
                 Library(controller)
             }
-            JrToast(controller)
             controller.error?.let { msg ->
                 val jr = LocalJr.current
                 AlertDialog(

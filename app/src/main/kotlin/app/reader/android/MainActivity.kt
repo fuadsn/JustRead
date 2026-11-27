@@ -33,7 +33,6 @@ import app.reader.SettingsStore
 
 class MainActivity : ComponentActivity() {
     private lateinit var controller: AppController
-    private var updater: Updater? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -43,7 +42,6 @@ class MainActivity : ComponentActivity() {
         app.reader.BookStore.init(applicationContext)
         controller = AppController()
         lifecycleScope.launch { controller.loadLibrary() } // lists saved books off the main thread
-        updater = Updater(this, controller).also { it.start() } // looks for a newer release on GitHub
         val picker = registerForActivityResult(ActivityResultContracts.OpenDocument()) { uri -> uri?.let { openUri(it) } }
         controller.requestOpenFile = { picker.launch(arrayOf("application/epub+zip", "application/octet-stream")) }
         Hooks.setBrightness = { v ->
@@ -114,11 +112,6 @@ class MainActivity : ComponentActivity() {
         if (SettingsStore.get("nightMode") == mode.toString()) return
         getSystemService(android.app.UiModeManager::class.java)?.setApplicationNightMode(mode)
         SettingsStore.put("nightMode", mode.toString())
-    }
-
-    override fun onDestroy() {
-        updater?.stop()
-        super.onDestroy()
     }
 
     override fun onNewIntent(intent: Intent) {

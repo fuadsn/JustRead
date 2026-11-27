@@ -8,7 +8,6 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
-import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.WindowInsets
 import androidx.compose.foundation.layout.aspectRatio
 import androidx.compose.foundation.layout.asPaddingValues
@@ -35,10 +34,8 @@ import androidx.compose.material3.RadioButtonDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalConfiguration
@@ -47,9 +44,6 @@ import androidx.compose.foundation.layout.union
 import androidx.compose.foundation.layout.only
 import androidx.compose.foundation.layout.WindowInsetsSides
 import androidx.compose.foundation.layout.fillMaxHeight
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.graphics.Color
-import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.focus.FocusRequester
 import androidx.compose.ui.focus.focusRequester
@@ -108,9 +102,6 @@ fun Library(controller: AppController) {
                 val full: androidx.compose.foundation.lazy.grid.LazyGridItemSpanScope.() -> GridItemSpan = { GridItemSpan(maxLineSpan) }
                 if (!searching) {
                     val inset = Modifier.padding(horizontal = if (grid) 0.dp else 16.dp)
-                    if (controller.update != UpdateState.Idle) item(span = full) {
-                        UpdateCard(controller, inset.padding(top = 8.dp, bottom = if (grid) 0.dp else 12.dp))
-                    }
                     if (sideways) item(span = full) {
                         // side by side when the screen is wide and held sideways
                         Row(inset.padding(top = if (short) 4.dp else 8.dp, bottom = if (grid) 0.dp else 12.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min),
@@ -179,7 +170,6 @@ private fun TopBar(
                     // keep clear of the screen edge, a little below the button
                     offset = androidx.compose.ui.unit.DpOffset((-12).dp, 4.dp), modifier = Modifier.width(232.dp)) {
                     MenuRow("Daily reading goal", JrIcons.Target) { menu = false; onGoal() }
-                    controller.checkForUpdates?.let { check -> MenuRow("Check for updates", JrIcons.Download) { menu = false; check(true) } }
                 }
             }
         }
@@ -215,69 +205,6 @@ private fun FeaturedBook(controller: AppController, book: ShelfBook, modifier: M
                 maxLines = 2, overflow = TextOverflow.Ellipsis)
             val detail = if (progress == null) book.author else listOfNotNull(controller.chapterTitle(book), "$pct% read").joinToString(" · ")
             if (detail.isNotBlank()) Text(detail, style = JrType.caption, color = jr.onSecondaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis)
-        }
-    }
-}
-
-/** An app update, as in the design: available, downloading, ready to install, or what went wrong. */
-@Composable
-private fun UpdateCard(controller: AppController, modifier: Modifier) {
-    val jr = LocalJr.current
-    val s = controller.update
-    if (s == UpdateState.Idle) return
-    val bg = if (jr.dark) jr.secondaryContainer else Color(0xFFF3DDBF)
-    val ink = if (jr.dark) jr.onSecondaryContainer else Color(0xFF2A1A07)
-    val soft = if (jr.dark) jr.onVariant else Color(0xFF5A4632)
-    val disc = if (jr.dark) jr.background else Color(0xFFF9F2E5)
-    fun mb(b: Long) = if (b >= 10_000_000) "${(b / 1_000_000.0).roundToInt()} MB" else "%.1f MB".format(b / 1_000_000.0)
-    val (icon, tint) = when (s) {
-        is UpdateState.Ready -> JrIcons.Check to jr.tertiary
-        is UpdateState.Failed -> JrIcons.Alert to jr.error
-        else -> JrIcons.Download to jr.primary
-    }
-    val (title, detail) = when (s) {
-        is UpdateState.Available -> "Version ${s.version} is available" to
-            ("You have ${s.installed}" + if (s.bytes > 0) " · ${mb(s.bytes)} download" else "")
-        is UpdateState.Downloading -> "Downloading ${s.version}" to
-            (if (s.total > 0) "${(s.done * 100 / s.total).toInt()}% · ${mb(s.done).removeSuffix(" MB")} of ${mb(s.total)}" else mb(s.done))
-        is UpdateState.Ready -> "Version ${s.version} is ready to install" to "Android will ask you to confirm."
-        is UpdateState.Failed -> s.title to s.message
-        UpdateState.Idle -> return
-    }
-    Column(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(bg)
-        .semantics { contentDescription = title }
-        .padding(start = 16.dp, end = 16.dp, top = 16.dp, bottom = 12.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-            Box(Modifier.size(40.dp).clip(CircleShape).background(disc), contentAlignment = Alignment.Center) {
-                Icon(icon, null, tint = if (jr.dark && s !is UpdateState.Failed) ink else tint, modifier = Modifier.size(22.dp))
-            }
-            Column(Modifier.weight(1f)) {
-                Text(title, style = JrType.label, color = ink)
-                Text(detail, style = JrType.caption, color = soft, modifier = Modifier.padding(top = 2.dp))
-            }
-        }
-        if (s is UpdateState.Downloading) {
-            val f = if (s.total > 0) s.done / s.total.toFloat() else 0f
-            Box(Modifier.padding(start = 54.dp, top = 4.dp)) { StopProgress(f, Modifier.fillMaxWidth(), track = disc) }
-        }
-        Row(Modifier.fillMaxWidth().padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp, Alignment.End)) {
-            val (quiet, quietAction) = when (s) {
-                is UpdateState.Downloading -> "Cancel" to { controller.cancelUpdate?.invoke(); Unit }
-                is UpdateState.Failed -> "Dismiss" to { controller.update = UpdateState.Idle }
-                else -> "Later" to { controller.update = UpdateState.Idle }
-            }
-            Box(Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).clickable(onClick = quietAction).padding(horizontal = 12.dp),
-                contentAlignment = Alignment.Center) { Text(quiet, style = JrType.label, color = jr.primary) }
-            val main: Pair<String, () -> Unit>? = when (s) {
-                is UpdateState.Available -> "Update" to { controller.downloadUpdate?.invoke(); Unit }
-                is UpdateState.Ready -> "Install" to { controller.installUpdate?.invoke(); Unit }
-                is UpdateState.Failed -> "Try again" to { controller.downloadUpdate?.invoke(); Unit }
-                else -> null
-            }
-            if (main != null) Box(Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(jr.primary)
-                .clickable(onClick = main.second).padding(horizontal = 24.dp), contentAlignment = Alignment.Center) {
-                Text(main.first, style = JrType.label, color = jr.onPrimary)
-            }
         }
     }
 }
