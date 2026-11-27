@@ -41,6 +41,11 @@ Jetpack Compose. No store, no accounts, no ads.
   variant. Appearance can follow the system, or the room through the light sensor.
 - **A library that keeps your place.** Continue reading, sort by recent, title, author, date added
   or progress, grid or list views, search, bookmarks, and a daily reading goal.
+- **Home themes.** From the library, open More options → Home theme to choose Parchment, Sage,
+  Midnight, or Match reader appearance.
+- **Sentence reading.** Turn a phone sideways to read one sentence or short passage at a time.
+  Tap Play to advance at your chosen pace, or use Previous and Next. Normal reading switches
+  landscape to a single page and remembers your choice. More → Speed reading turns cards back on.
 - **Comfort settings.** In-app brightness and a rotation lock.
 
 ## Status
@@ -50,8 +55,7 @@ and encrypted (DRM) books are refused.
 
 ## Download
 
-Get the latest APK from [Releases](https://github.com/JobinBiju/JustRead/releases/latest). Most
-phones want the `arm64-v8a` build; the `universal` one works anywhere. Android 8.0 or newer.
+Build this fork using the instructions below. The [upstream releases](https://github.com/JobinBiju/JustRead/releases/latest) contain the original app. Android 8.0 or newer is required.
 
 ## Building
 

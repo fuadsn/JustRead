@@ -21,7 +21,7 @@ import app.reader.android.R
 
 /** The JustRead palette: warm paper, brown ink, one leather-brown accent and a moss green for goals. */
 @Immutable
-class JrColors(
+data class JrColors(
     val dark: Boolean,
     val background: Color,
     val onBackground: Color,
@@ -67,6 +67,33 @@ val DarkJr = JrColors(
     menu = Color(0xFF2E2820), tertiary = Color(0xFFBDCD9B), scrim = Color(0x8F000000), error = Color(0xFFFFB4A9),
     shadow = Color(0xFF000000),
 )
+
+private val SageJr = LightJr.copy(
+    background = Color(0xFFF1F4EB), onBackground = Color(0xFF19281D), onVariant = Color(0xFF425748),
+    primary = Color(0xFF345C42), container = Color(0xFFE4EADB), sheet = Color(0xFFF1F4EB),
+    secondaryContainer = Color(0xFFCFE1CC), onSecondaryContainer = Color(0xFF17331F),
+    outline = Color(0xFF718273), outlineVariant = Color(0xFFC6D1C2), track = Color(0xFFD4DECF),
+    menu = Color(0xFFE5ECDF), tertiary = Color(0xFF436052),
+)
+
+private val MidnightJr = DarkJr.copy(
+    background = Color(0xFF121723), onBackground = Color(0xFFEDF0FC), onVariant = Color(0xFFB8C3D9),
+    primary = Color(0xFFBBCBF7), onPrimary = Color(0xFF182644), container = Color(0xFF1F2739), sheet = Color(0xFF1A2130),
+    secondaryContainer = Color(0xFF2D3951), onSecondaryContainer = Color(0xFFE4EBFF),
+    outline = Color(0xFF8895AF), outlineVariant = Color(0xFF3B465C), track = Color(0xFF333E52),
+    menu = Color(0xFF242D41), tertiary = Color(0xFFABCFCC),
+)
+
+enum class HomeTheme(val label: String) {
+    MatchReader("Match reader appearance"), Parchment("Parchment"), Sage("Sage"), Midnight("Midnight");
+
+    fun palette(readerDark: Boolean): JrColors = when (this) {
+        MatchReader -> if (readerDark) DarkJr else LightJr
+        Parchment -> LightJr
+        Sage -> SageJr
+        Midnight -> MidnightJr
+    }
+}
 
 val LocalJr = staticCompositionLocalOf { LightJr }
 
@@ -148,10 +175,9 @@ fun rememberBundledFonts() {
 }
 
 @Composable
-fun JustReadTheme(dark: Boolean, content: @Composable () -> Unit) {
-    val jr = if (dark) DarkJr else LightJr
-    val scheme = remember(dark) {
-        if (dark) darkColorScheme(
+fun JustReadTheme(jr: JrColors, content: @Composable () -> Unit) {
+    val scheme = remember(jr) {
+        if (jr.dark) darkColorScheme(
             primary = jr.primary, onPrimary = jr.onPrimary, background = jr.background, onBackground = jr.onBackground,
             surface = jr.background, onSurface = jr.onBackground, onSurfaceVariant = jr.onVariant,
             secondaryContainer = jr.secondaryContainer, onSecondaryContainer = jr.onSecondaryContainer,

@@ -25,9 +25,7 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import app.reader.App
 import app.reader.AppController
-import app.reader.DarkJr
 import app.reader.Hooks
-import app.reader.LightJr
 import app.reader.ReadingOrientation
 import app.reader.SettingsStore
 
@@ -68,7 +66,7 @@ class MainActivity : ComponentActivity() {
             val settings = controller.settings
             val uiDark = settings.appearanceDark(systemDark)
             val bg = if (controller.reading != null) settings.theme.colors(uiDark).page
-            else if (uiDark) DarkJr.background else LightJr.background
+            else controller.homeTheme.palette(uiDark).background
             SideEffect {
                 WindowCompat.getInsetsController(window, window.decorView).apply {
                     isAppearanceLightStatusBars = bg.luminance() > 0.5f

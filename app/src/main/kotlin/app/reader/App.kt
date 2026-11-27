@@ -70,6 +70,14 @@ class AppController(private val restoreLastBook: Boolean = true) {
             SettingsStore.put("lastBook", v?.key ?: "")
             if (v != null) { SettingsStore.put("seen:" + v.key, nowMillis().toString()); touch() }
         }
+    var homeTheme by mutableStateOf(HomeTheme.entries.firstOrNull { it.name == SettingsStore.get("homeTheme") } ?: HomeTheme.MatchReader)
+        private set
+
+    fun selectHomeTheme(theme: HomeTheme) {
+        homeTheme = theme
+        SettingsStore.put("homeTheme", theme.name)
+    }
+
     var settings by mutableStateOf(ReaderSettings.decode(SettingsStore.get("settings")))
         private set
     var error by mutableStateOf<String?>(null)
@@ -286,7 +294,7 @@ fun App(controller: AppController = remember { AppController() }, systemDark: Bo
         Hooks.setOrientation(if (reading != null) settings.orientation else ReadingOrientation.System)
     }
 
-    JustReadTheme(uiDark) {
+    JustReadTheme(if (reading == null) controller.homeTheme.palette(uiDark) else HomeTheme.MatchReader.palette(uiDark)) {
         CompositionLocalProvider(LocalBackStack provides controller.back) {
             if (reading != null) {
                 BackAction { controller.reading = null }
@@ -303,7 +311,7 @@ fun App(controller: AppController = remember { AppController() }, systemDark: Bo
             } else if (controller.restoring) {
                 Box(Modifier.fillMaxSize().background(LocalJr.current.background))
             } else {
-                Library(controller)
+                Library(controller, uiDark)
             }
             controller.error?.let { msg ->
                 val jr = LocalJr.current

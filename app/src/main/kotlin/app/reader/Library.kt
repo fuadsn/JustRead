@@ -1,5 +1,10 @@
 package app.reader
 
+import androidx.compose.foundation.selection.selectableGroup
+import androidx.compose.foundation.selection.selectable
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.ui.semantics.Role
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,12 +65,13 @@ import androidx.compose.ui.unit.dp
 import kotlin.math.roundToInt
 
 @Composable
-fun Library(controller: AppController) {
+fun Library(controller: AppController, readerDark: Boolean) {
     val jr = LocalJr.current
     @Suppress("UNUSED_VARIABLE") val version = controller.metaVersion // recompose when saved data changes
     var searching by remember { mutableStateOf(false) }
     var query by remember { mutableStateOf("") }
     var sortSheet by remember { mutableStateOf(false) }
+    var themeDialog by remember { mutableStateOf(false) }
     var goalDialog by remember { mutableStateOf(false) }
 
     val books = controller.sortedShelf().let { all ->
@@ -93,7 +99,7 @@ fun Library(controller: AppController) {
         Column(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.statusBars)
             .windowInsetsPadding(WindowInsets.displayCutout.union(WindowInsets.navigationBars).only(WindowInsetsSides.Horizontal))) {
             TopBar(controller, searching, query, onQuery = { query = it }, onSearch = { searching = it; if (!it) query = "" },
-                onGoal = { goalDialog = true }, start = edge, height = if (short) 48.dp else 64.dp)
+                onGoal = { goalDialog = true }, onTheme = { themeDialog = true }, start = edge, height = if (short) 48.dp else 64.dp)
             LazyVerticalGrid(
                 columns = columns,
                 modifier = Modifier.fillMaxSize(),
@@ -136,13 +142,39 @@ fun Library(controller: AppController) {
             }
         }
         if (sortSheet) SortSheet(controller) { sortSheet = false }
+        if (themeDialog) HomeThemePicker(controller.homeTheme, readerDark, onSelect = controller::selectHomeTheme) { themeDialog = false }
         if (goalDialog) GoalDialog(controller) { goalDialog = false }
     }
 }
 
 @Composable
+private fun HomeThemePicker(selected: HomeTheme, readerDark: Boolean, onSelect: (HomeTheme) -> Unit, onClose: () -> Unit) {
+    val jr = LocalJr.current
+    androidx.compose.material3.AlertDialog(onDismissRequest = onClose, containerColor = jr.sheet,
+        title = { Text("Home theme", style = JrType.headline, color = jr.onBackground) },
+        text = {
+            Column(Modifier.verticalScroll(rememberScrollState()).selectableGroup()) {
+                for (theme in HomeTheme.entries) {
+                    val palette = theme.palette(readerDark)
+                    Row(Modifier.fillMaxWidth().selectable(selected == theme, role = Role.RadioButton, onClick = { onSelect(theme) })
+                        .padding(vertical = 8.dp), verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Box(Modifier.size(32.dp).clip(RoundedCornerShape(8.dp)).background(palette.secondaryContainer)
+                            .border(1.dp, palette.outline, RoundedCornerShape(8.dp)), contentAlignment = Alignment.Center) {
+                            Box(Modifier.size(12.dp).background(palette.primary, androidx.compose.foundation.shape.CircleShape))
+                        }
+                        Text(theme.label, style = JrType.bodyLarge, modifier = Modifier.weight(1f), color = jr.onBackground)
+                        RadioButton(selected = selected == theme, onClick = null)
+                    }
+                }
+            }
+        },
+        confirmButton = { androidx.compose.material3.TextButton(onClick = onClose) { Text("Done") } })
+}
+
+@Composable
 private fun TopBar(
-    controller: AppController, searching: Boolean, query: String, onQuery: (String) -> Unit, onSearch: (Boolean) -> Unit, onGoal: () -> Unit,
+    controller: AppController, searching: Boolean, query: String, onQuery: (String) -> Unit, onSearch: (Boolean) -> Unit, onGoal: () -> Unit, onTheme: () -> Unit,
     start: androidx.compose.ui.unit.Dp = 24.dp, height: androidx.compose.ui.unit.Dp = 64.dp,
 ) {
     val jr = LocalJr.current
@@ -171,6 +203,7 @@ private fun TopBar(
                 DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = jr.menu,
                     // keep clear of the screen edge, a little below the button
                     offset = androidx.compose.ui.unit.DpOffset((-12).dp, 4.dp), modifier = Modifier.width(232.dp)) {
+                    MenuRow("Home theme", JrIcons.Sun) { menu = false; onTheme() }
                     MenuRow("Daily reading goal", JrIcons.Target) { menu = false; onGoal() }
                 }
             }
