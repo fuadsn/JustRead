@@ -429,10 +429,10 @@ fun BookCover(b: ShelfBook, modifier: Modifier, showText: Boolean = true, corner
         if (img != null) {
             Image(img, contentDescription = "Cover of ${b.title}", contentScale = ContentScale.Crop, modifier = Modifier.fillMaxSize())
         } else {
-            val art = coverArts[(b.key.hashCode() and 0x7fffffff) % coverArts.size]
+            val art = if (b.storeId == null && b.title == SampleBook.TITLE) coverArts.first() else coverArts[(b.key.hashCode() and 0x7fffffff) % coverArts.size]
             BoxWithConstraints(Modifier.fillMaxSize().background(art.bg)) {
                 val w = maxWidth.value
-                Canvas(Modifier.fillMaxSize()) { drawMotif(art) }
+                Canvas(Modifier.fillMaxSize()) { drawMotif(art, b.storeId == null && b.title == SampleBook.TITLE) }
                 if (showText && w > 50f) {
                     Column(Modifier.padding((w * 0.088f).dp), verticalArrangement = Arrangement.spacedBy((w * 0.037f).dp)) {
                         Text(b.title, color = art.ink, fontFamily = JrType.serifFamily, fontWeight = FontWeight.SemiBold,
@@ -448,29 +448,32 @@ fun BookCover(b: ShelfBook, modifier: Modifier, showText: Boolean = true, corner
     }
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMotif(art: CoverArt) {
-    val w = size.width; val h = size.height
-    when (art.motif) {
-        0 -> drawCircle(art.ink, w * 0.55f, Offset(w * 0.79f, h * 0.86f))
-        1 -> {
-            val heights = listOf(0.27f, 0.38f, 0.49f, 0.38f, 0.27f)
-            heights.forEachIndexed { i, f ->
-                drawRect(art.ink, Offset(w * (0.175f + 0.1435f * i), h * (1f - f)), Size(w * 0.088f, h * f))
-            }
+private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawMotif(art: CoverArt, lighthouse: Boolean) {
+    val w = size.width
+    val h = size.height
+    val horizon = h * 0.76f
+    val sunX = w * (0.24f + art.motif * 0.12f)
+    drawCircle(art.ink, w * 0.085f, Offset(sunX, h * 0.60f))
+    // Parallel engraved ridges form a different horizon for each cloth colour.
+    repeat(12) { line ->
+        val y = horizon + line * h * 0.026f
+        val ridge = Path().apply {
+            moveTo(-w * 0.05f, y)
+            cubicTo(w * 0.28f, y - h * (0.12f + art.motif * 0.02f),
+                w * 0.58f, y + h * 0.10f, w * 1.05f, y - h * 0.055f)
         }
-        2 -> {
-            drawRect(art.ink.copy(alpha = 0.55f), Offset(0f, h * 0.65f), Size(w, h * 0.18f))
-            drawCircle(art.ink, w * 0.106f, Offset(w * 0.73f, h * 0.48f), style = Stroke(w * 0.015f))
-        }
-        3 -> {
-            drawCircle(art.ink, w * 0.25f, Offset(w * 0.375f, h * 0.68f), style = Stroke(w * 0.015f))
-            drawCircle(art.ink, w * 0.25f, Offset(w * 0.625f, h * 0.68f), style = Stroke(w * 0.015f))
-        }
-        else -> {
-            // three horizon lines, shortening upwards: abstract, no symbols
-            listOf(0.72f, 0.5f, 0.3f).forEachIndexed { i, f ->
-                drawRect(art.ink.copy(alpha = 0.85f - 0.2f * i), Offset(w * 0.12f, h * (0.82f - 0.07f * i)), Size(w * f, w * 0.035f))
-            }
-        }
+        drawPath(ridge, art.ink.copy(alpha = 0.78f), style = Stroke(w * 0.009f))
     }
+    if (lighthouse) {
+        val tower = Path().apply {
+            moveTo(w * 0.69f, h * 0.736f)
+            lineTo(w * 0.708f, h * 0.57f)
+            lineTo(w * 0.75f, h * 0.57f)
+            lineTo(w * 0.774f, h * 0.736f)
+            close()
+        }
+        drawPath(tower, art.ink)
+        drawRect(art.ink, Offset(w * 0.696f, h * 0.542f), Size(w * 0.064f, h * 0.016f))
+    }
+    drawLine(art.ink.copy(alpha = 0.28f), Offset(w * 0.048f, 0f), Offset(w * 0.048f, h), w * 0.005f)
 }

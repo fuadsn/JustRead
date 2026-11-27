@@ -77,6 +77,7 @@ fun Library(controller: AppController) {
     }
     val current = controller.shelf.filter { controller.position(it) != null && !controller.finished(it) }
         .maxByOrNull { controller.lastOpened(it) }
+    val featured = current ?: books.firstOrNull { !controller.finished(it) }
     val grid = controller.view == ShelfView.Grid
     val navBottom = WindowInsets.navigationBars.asPaddingValues().calculateBottomPadding()
     // screen size, as the design has it: phone, phone on its side (short), tablet
@@ -114,18 +115,18 @@ fun Library(controller: AppController) {
                         // side by side when the screen is wide and held sideways
                         Row(inset.padding(top = if (short) 4.dp else 8.dp, bottom = if (grid) 0.dp else 12.dp).height(androidx.compose.foundation.layout.IntrinsicSize.Min),
                             horizontalArrangement = Arrangement.spacedBy(if (tablet) 24.dp else 16.dp)) {
-                            if (current != null) {
-                                if (short) CompactContinueCard(controller, current, Modifier.weight(3f))
-                                else ContinueCard(controller, current, Modifier.weight(3f))
+                            if (featured != null) {
+                                if (short) FeaturedBook(controller, featured, Modifier.weight(3f), compact = true)
+                                else FeaturedBook(controller, featured, Modifier.weight(3f), compact = false)
                             }
-                            GoalCard(controller, Modifier.weight(2f).fillMaxHeight(), tall = current != null) { goalDialog = true }
+                            GoalCard(controller, Modifier.weight(2f).fillMaxHeight(), tall = featured != null) { goalDialog = true }
                         }
                     } else {
-                        if (current != null) item(span = full) {
-                            ContinueCard(controller, current, inset.padding(top = 8.dp, bottom = if (grid) 0.dp else 12.dp))
+                        if (featured != null) item(span = full) {
+                            FeaturedBook(controller, featured, inset.padding(top = 8.dp, bottom = if (grid) 0.dp else 12.dp), compact = false)
                         }
                         item(span = full) {
-                            GoalCard(controller, inset.padding(top = if (current != null) 0.dp else 8.dp, bottom = if (grid) 0.dp else 12.dp)) { goalDialog = true }
+                            GoalCard(controller, inset.padding(top = if (featured != null) 0.dp else 8.dp, bottom = if (grid) 0.dp else 12.dp)) { goalDialog = true }
                         }
                     }
                 }
@@ -170,13 +171,13 @@ private fun TopBar(
                 append("Just")
                 withStyle(SpanStyle(color = jr.primary)) { append("Read") }
             }, style = JrType.wordmark, color = jr.onBackground, modifier = Modifier.weight(1f).semantics { contentDescription = "JustRead" })
+            controller.requestOpenFile?.let { IconBtn(JrIcons.Plus, "Add an EPUB", jr.primary, onClick = it) }
             IconBtn(JrIcons.Search, "Search library", jr.onBackground) { onSearch(true) }
             Box {
                 IconBtn(JrIcons.More, "More options", jr.onBackground) { menu = true }
                 DropdownMenu(menu, onDismissRequest = { menu = false }, containerColor = jr.menu,
                     // keep clear of the screen edge, a little below the button
                     offset = androidx.compose.ui.unit.DpOffset((-12).dp, 4.dp), modifier = Modifier.width(232.dp)) {
-                    if (controller.requestOpenFile != null) MenuRow("Add a book", JrIcons.Plus) { menu = false; controller.requestOpenFile?.invoke() }
                     MenuRow("Daily reading goal", JrIcons.Target) { menu = false; onGoal() }
                     controller.checkForUpdates?.let { check -> MenuRow("Check for updates", JrIcons.Download) { menu = false; check(true) } }
                 }
@@ -198,58 +199,22 @@ fun MenuRow(label: String, icon: androidx.compose.ui.graphics.vector.ImageVector
 }
 
 @Composable
-private fun ContinueCard(controller: AppController, b: ShelfBook, modifier: Modifier) {
+private fun FeaturedBook(controller: AppController, book: ShelfBook, modifier: Modifier, compact: Boolean) {
     val jr = LocalJr.current
-    val progress = controller.progress(b) ?: 0f
-    val pct = (progress * 100).roundToInt()
-    Row(modifier.fillMaxWidth().height(128.dp).clip(RoundedCornerShape(12.dp)).background(jr.container)
-        .clickable { controller.reading = b }.padding(16.dp)
-        .semantics { contentDescription = "Resume ${b.title}, $pct% read" },
+    val progress = controller.progress(book)
+    val pct = ((progress ?: 0f) * 100).roundToInt()
+    val action = if (progress == null) "Start reading" else "Continue reading"
+    Row(modifier.fillMaxWidth().clip(RoundedCornerShape(16.dp)).background(jr.secondaryContainer)
+        .clickable(onClickLabel = "$action ${book.title}") { controller.reading = book }
+        .padding(if (compact) 12.dp else 20.dp),
         verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(16.dp)) {
-        BookCover(b, Modifier.width(64.dp).height(96.dp), showText = false)
-        Column(Modifier.weight(1f).height(96.dp)) {
-            Text("Continue reading", style = JrType.labelSmall, color = jr.onVariant)
-            Text(b.title, style = JrType.titleLarge, color = jr.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis,
-                modifier = Modifier.padding(top = 2.dp))
-            controller.chapterTitle(b)?.let {
-                Text(it, style = JrType.body, color = jr.onVariant, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            }
-            Spacer(Modifier.weight(1f))
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(10.dp)) {
-                StopProgress(progress, Modifier.weight(1f))
-                Text("$pct%", style = JrType.labelSmall, color = jr.onVariant)
-            }
-        }
-        Box(Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(jr.primary).clickable { controller.reading = b }
-            .padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-            Text("Resume", style = JrType.label, color = jr.onPrimary)
-        }
-    }
-}
-
-/** Continue reading on a phone held sideways: one short row with the Resume button, as in the design. */
-@Composable
-private fun CompactContinueCard(controller: AppController, b: ShelfBook, modifier: Modifier) {
-    val jr = LocalJr.current
-    val progress = controller.progress(b) ?: 0f
-    val pct = (progress * 100).roundToInt()
-    Row(modifier.height(84.dp).clip(RoundedCornerShape(12.dp)).background(jr.container)
-        .clickable { controller.reading = b }.padding(start = 12.dp, end = 16.dp)
-        .semantics { contentDescription = "Resume ${b.title}, $pct% read" },
-        verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(14.dp)) {
-        BookCover(b, Modifier.width(40.dp).height(60.dp), showText = false, corner = 3.dp)
-        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(2.dp)) {
-            Text(b.title, style = JrType.serif(16, 22), color = jr.onBackground, maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Text(listOfNotNull("Continue", controller.chapterTitle(b)).joinToString(" · "), style = JrType.caption, color = jr.onVariant,
-                maxLines = 1, overflow = TextOverflow.Ellipsis)
-            Row(Modifier.padding(top = 4.dp), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                StopProgress(progress, Modifier.weight(1f))
-                Text("$pct%", style = JrType.sans(11, 16, FontWeight.Medium), color = jr.onVariant)
-            }
-        }
-        Box(Modifier.height(40.dp).clip(RoundedCornerShape(20.dp)).background(jr.primary).clickable { controller.reading = b }
-            .padding(horizontal = 20.dp), contentAlignment = Alignment.Center) {
-            Text("Resume", style = JrType.label, color = jr.onPrimary)
+        BookCover(book, Modifier.width(if (compact) 48.dp else 76.dp).aspectRatio(0.67f), showText = false)
+        Column(Modifier.weight(1f), verticalArrangement = Arrangement.spacedBy(4.dp)) {
+            Text(action, style = JrType.labelSmall, color = jr.onSecondaryContainer)
+            Text(book.title, style = if (compact) JrType.title else JrType.headline, color = jr.onSecondaryContainer,
+                maxLines = 2, overflow = TextOverflow.Ellipsis)
+            val detail = if (progress == null) book.author else listOfNotNull(controller.chapterTitle(book), "$pct% read").joinToString(" · ")
+            if (detail.isNotBlank()) Text(detail, style = JrType.caption, color = jr.onSecondaryContainer, maxLines = 1, overflow = TextOverflow.Ellipsis)
         }
     }
 }
