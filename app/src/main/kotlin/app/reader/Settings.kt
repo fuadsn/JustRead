@@ -125,6 +125,7 @@ data class ReaderSettings(
     /** Screen brightness 0…1 while reading, or −1 to follow the system. */
     val brightness: Float = -1f,
     val lineGuide: Boolean = false,
+    val landscapeSpeedReading: Boolean = true,
     val orientation: ReadingOrientation = ReadingOrientation.System,
 ) {
     /** Whether pages and the app chrome are dark, given the system's and the room's state. */
@@ -163,7 +164,7 @@ data class ReaderSettings(
         "v=2", "theme=${theme.name}", "appearance=${appearance.name}", "font=${font.name}", "size=$sizeStep",
         "custom=$customized", "bold=$bold", "justify=$justify", "cs=$customSpacing", "lh=$lineHeight", "ls=$letterSpacing",
         "ws=$wordSpacing", "madj=$marginAdjust", "columns=${columns.name}", "turn=${pageTurn.name}",
-        "bright=$brightness", "guide=$lineGuide", "orientation=${orientation.name}",
+        "bright=$brightness", "guide=$lineGuide", "orientation=${orientation.name}", "landscapeSpeed=$landscapeSpeedReading",
     ).joinToString(";")
 
     companion object {
@@ -208,6 +209,7 @@ data class ReaderSettings(
                     pageTurn = enumOr(m["turn"], d.pageTurn),
                     brightness = m["bright"]?.toFloatOrNull()?.coerceIn(-1f, 1f) ?: -1f,
                     lineGuide = m["guide"]?.toBoolean() ?: false,
+                    landscapeSpeedReading = m["landscapeSpeed"]?.toBooleanStrictOrNull() ?: true,
                     orientation = enumOr(m["orientation"], if (m["lock"] == "true") ReadingOrientation.Locked else ReadingOrientation.System),
                 )
             }.getOrDefault(d)

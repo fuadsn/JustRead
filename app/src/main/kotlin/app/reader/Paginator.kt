@@ -71,9 +71,10 @@ class PageSpec(
     val headerY = v[0] * density + insetTop
     val footerY = v[3] * density + insetBottom
 
+    private val phoneLandscape = !tablet && dpW > dpH
     val marginH = ((ReaderSettings.BASE_MARGIN_DP + HTML_SIDE_MARGIN_DP) * density + width * settings.effectiveMargin / 100f)
         .let { if (tablet) maxOf(it, width * (if (spread) 0.125f else 0.14f)) else it } // the boards: 80 of 640 dp, 112 of 800 dp
-        .coerceAtLeast(8f * density)
+        .coerceAtLeast(if (phoneLandscape) maxOf(8f * density, (width - 580f * density) / 2) else 8f * density)
     val marginTop = v[1] * density + insetTop
     val marginBottom = v[2] * density + insetBottom
     /** On a narrow spread the margins at the spine are half the outer ones, as in a printed book. */
@@ -85,7 +86,7 @@ class PageSpec(
         PageSide.Right -> if (narrowSpread) -marginH / 3f else 0f
     }
     val columns = when {
-        spread || settings.pageTurn == PageTurn.Scroll -> 1
+        phoneLandscape || spread || settings.pageTurn == PageTurn.Scroll -> 1
         settings.columns == Columns.One -> 1
         settings.columns == Columns.Two -> if (width / density >= 480f) 2 else 1
         else -> if (width > height * 1.05f && width / density >= 640f) 2 else 1
